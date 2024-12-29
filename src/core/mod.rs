@@ -11,8 +11,8 @@ pub use self::dictionary::{Dictionaries, Dictionary, DictionaryEntry};
 pub use self::env::{Environment, SourceBlock};
 pub use self::lexer::Lexer;
 pub use self::stack::{
-    HashMapTreeKey, HashMapTreeNode, OwnedCellSlice, SharedBox, Stack, StackTuple, StackValue,
-    StackValueType, WordList,
+    Atom, HashMapTreeKey, HashMapTreeNode, OwnedCellSlice, SharedBox, Stack, StackTuple,
+    StackValue, StackValueType, WordList,
 };
 
 pub mod cont;

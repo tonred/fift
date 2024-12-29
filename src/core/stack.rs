@@ -5,12 +5,12 @@ use ahash::HashMap;
 use anyhow::Result;
 use dyn_clone::DynClone;
 use everscale_types::prelude::*;
+pub use everscale_vm::OwnedCellSlice;
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive, Zero};
 use rand::Rng;
 
 use super::cont::*;
-use crate::util::DisplaySliceExt;
 
 pub struct Stack {
     items: Vec<Rc<dyn StackValue>>,
@@ -166,6 +166,20 @@ impl Stack {
         anyhow::bail!(StackError::IntegerOutOfSignedRange {
             min: min as isize,
             max: max as isize,
+            actual: item.to_string(),
+        })
+    }
+
+    pub fn pop_long_range(&mut self, min: u64, max: u64) -> Result<u64> {
+        let item = self.pop_int()?;
+        if let Some(item) = item.to_u64() {
+            if item >= min && item <= max {
+                return Ok(item);
+            }
+        }
+        anyhow::bail!(StackError::IntegerOutOfRange {
+            min: min as _,
+            max: max as usize,
             actual: item.to_string(),
         })
     }
@@ -435,7 +449,7 @@ define_stack_value! {
         Slice(OwnedCellSlice) = {
             eq(a, b) = *a == b,
             fmt_dump(v, f) = std::fmt::Display::fmt(v, f),
-            as_slice(v): CellSlice = v.apply(),
+            as_slice(v): CellSlice = v.apply().map_err(Into::into),
             into_slice,
         },
         String(String) = {
@@ -607,59 +621,6 @@ impl dyn StackValue + '_ {
 }
 
 pub type StackTuple = Vec<Rc<dyn StackValue>>;
-
-#[derive(Clone)]
-pub struct OwnedCellSlice {
-    cell: Cell,
-    range: CellSliceRange,
-}
-
-impl OwnedCellSlice {
-    pub fn new(cell: Cell) -> Self {
-        let range = CellSliceRange::full(cell.as_ref());
-        Self { cell, range }
-    }
-
-    pub fn apply(&self) -> Result<CellSlice<'_>> {
-        self.range.apply(&self.cell).map_err(From::from)
-    }
-
-    pub fn range(&self) -> CellSliceRange {
-        self.range
-    }
-
-    pub fn set_range(&mut self, range: CellSliceRange) {
-        self.range = range
-    }
-}
-
-impl From<CellSliceParts> for OwnedCellSlice {
-    fn from((cell, range): CellSliceParts) -> Self {
-        Self { cell, range }
-    }
-}
-
-impl PartialEq<CellSlice<'_>> for OwnedCellSlice {
-    fn eq(&self, right: &CellSlice<'_>) -> bool {
-        if let Ok(left) = self.apply() {
-            if let Ok(std::cmp::Ordering::Equal) = left.lex_cmp(right) {
-                return true;
-            }
-        }
-        false
-    }
-}
-
-impl std::fmt::Display for OwnedCellSlice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.apply() {
-            Ok(slice) => {
-                write!(f, "CS{{{}}}", slice.display_slice_data())
-            }
-            Err(e) => write!(f, "CS{{Invalid: {e:?}}}"),
-        }
-    }
-}
 
 #[derive(Default, Clone)]
 pub struct WordList {

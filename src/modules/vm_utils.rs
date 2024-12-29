@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::rc::Rc;
 use std::sync::OnceLock;
 
 use anyhow::Result;
+use everscale_types::cell::{Cell, CellBuilder};
 use everscale_types::prelude::CellSlice;
+use everscale_vm::{GasParams, VmState};
 
 use crate::core::*;
+use crate::util::bitsize;
 
 pub struct VmUtils;
 
@@ -24,13 +28,119 @@ impl VmUtils {
         Ok(())
     }
 
-    #[cmd(name = "runvmx")]
     #[cmd(name = "dbrunvm")]
     #[cmd(name = "dbrunvm-parallel")]
     #[cmd(name = "vmcont")]
     #[cmd(name = "vmcont@")]
     fn interpret_run_vm(_ctx: &mut Context) -> Result<()> {
         anyhow::bail!("Unimplemented");
+    }
+
+    #[cmd(name = "runvmx")]
+    fn interpret_runvmx(ctx: &mut Context) -> Result<()> {
+        const LATEST_VERSION: u32 = 9;
+
+        struct StdoutWriter(&'static mut dyn Write);
+
+        impl std::fmt::Write for StdoutWriter {
+            fn write_str(&mut self, s: &str) -> std::fmt::Result {
+                self.0.write_all(s.as_bytes()).map_err(|_| std::fmt::Error)
+            }
+        }
+
+        impl StdoutWriter {
+            unsafe fn new<'a>(writer: &'a mut dyn Write) -> Self {
+                Self(std::mem::transmute::<
+                    &'a mut dyn Write,
+                    &'static mut dyn Write,
+                >(writer))
+            }
+        }
+
+        let mode = ctx.stack.pop_smallint_range(0, 0x7ff)?;
+
+        let global_version = if mode & 1024 != 0 {
+            ctx.stack.pop_smallint_range(0, LATEST_VERSION)?
+        } else {
+            LATEST_VERSION
+        };
+        let mut gas_max = if mode & 128 != 0 {
+            ctx.stack.pop_long_range(0, u64::MAX)?
+        } else {
+            u64::MAX
+        };
+        let gas_limit = if mode & 8 != 0 {
+            ctx.stack.pop_long_range(0, u64::MAX)?
+        } else {
+            u64::MAX
+        };
+
+        let gas_max = if mode & 128 == 0 {
+            gas_limit
+        } else {
+            std::cmp::max(gas_max, gas_limit)
+        };
+
+        let mut c7 = None;
+        if mode & 16 != 0 {
+            c7 = Some(map_fift_to_vm(ctx.stack.pop_tuple()?));
+        }
+
+        let with_data = mode & 4 != 0;
+        let mut data = None;
+        if with_data {
+            data = Some(ctx.stack.pop_cell()?);
+        }
+
+        let cs = ctx.stack.pop_slice()?;
+
+        let gas = everscale_vm::GasParams {
+            max: gas_max,
+            limit: gas_limit,
+            credit: 0,
+        };
+
+        let smc_info = everscale_vm::CustomSmcInfo {
+            version: everscale_vm::VmVersion::Ton(global_version),
+            c7: c7
+                .and_then(|item| item.into_tuple().ok())
+                .unwrap_or_default(),
+        };
+
+        let mut vm = VmState::builder()
+            .with_smc_info(smc_info)
+            .with_code(Rc::unwrap_or_clone(cs))
+            .with_gas(gas)
+            .with_debug(unsafe { StdoutWriter::new(ctx.stdout) });
+        if let Some(data) = &data {
+            vm = vm.with_data(Cell::clone(data));
+        }
+
+        if mode & 1 != 0 {
+            vm = vm.with_init_selector(mode & 2 != 0);
+        }
+
+        let mut vm = vm.build()?;
+
+        let res = vm.run();
+
+        ctx.stack.push_int(res)?;
+
+        let mut actions = None;
+        if let Some(commited) = vm.commited_state {
+            data = Some(Rc::new(commited.c4));
+            actions = Some(commited.c5);
+        }
+        if with_data {
+            ctx.stack.push_opt_raw(data)?;
+        }
+        if mode & 32 != 0 {
+            ctx.stack.push_opt(actions)?;
+        }
+        if mode & 8 != 0 {
+            ctx.stack.push_int(vm.gas.gas_consumed())?;
+        }
+        Ok(())
     }
 
     #[cmd(name = "(vmoplen)", stack)]
@@ -63,6 +173,71 @@ impl VmUtils {
         stack.push(dump)
     }
 }
+
+fn map_fift_to_vm(value: Rc<dyn StackValue>) -> everscale_vm::RcStackValue {
+    use everscale_vm::{Stack, Tuple};
+
+    match value.ty() {
+        StackValueType::Null => Stack::make_null(),
+        StackValueType::Int => {
+            let int = value.into_int().unwrap();
+            if bitsize(&int, true) <= 257 {
+                int
+            } else {
+                Stack::make_nan()
+            }
+        }
+        StackValueType::Cell => value.into_cell().unwrap(),
+        StackValueType::Builder => value.into_builder().unwrap(),
+        StackValueType::Slice => value.into_slice().unwrap(),
+        StackValueType::Tuple => match Rc::try_unwrap(value.into_tuple().unwrap()) {
+            Ok(items) => Rc::new(items.into_iter().map(map_fift_to_vm).collect::<Tuple>()),
+            Err(tuple) => Rc::new(tuple.iter().cloned().map(map_fift_to_vm).collect::<Tuple>()),
+        },
+        StackValueType::Atom => {
+            let atom = value.into_atom().unwrap();
+            if matches!(&*atom, Atom::Named(name) if name.as_ref() == ATOM_NAN) {
+                Stack::make_nan()
+            } else {
+                Stack::make_null()
+            }
+        }
+        _ => Stack::make_null(),
+    }
+}
+
+fn map_vm_to_fift(value: everscale_vm::RcStackValue, stack: &mut Stack) -> Rc<dyn StackValue> {
+    use everscale_vm::StackValueType;
+
+    match value.ty() {
+        StackValueType::Null => Stack::make_null(),
+        StackValueType::Int => match value.as_int() {
+            None => Rc::new(stack.atoms_mut().create_named(ATOM_NAN)),
+            Some(_) => value.into_int().unwrap(),
+        },
+        StackValueType::Cell => value.into_cell().unwrap(),
+        StackValueType::Slice => value.into_slice().unwrap(),
+        StackValueType::Builder => value.into_builder().unwrap(),
+        StackValueType::Cont => Stack::make_null(),
+        StackValueType::Tuple => match Rc::try_unwrap(value.into_tuple().unwrap()) {
+            Ok(items) => Rc::new(
+                items
+                    .into_iter()
+                    .map(|value| map_vm_to_fift(value, stack))
+                    .collect::<Vec<_>>(),
+            ),
+            Err(tuple) => Rc::new(
+                tuple
+                    .iter()
+                    .cloned()
+                    .map(|value| map_vm_to_fift(value, stack))
+                    .collect::<Vec<_>>(),
+            ),
+        },
+    }
+}
+
+const ATOM_NAN: &str = "NaN";
 
 fn cp0() -> &'static DispatchTable {
     fn make_cp0() -> Result<DispatchTable> {

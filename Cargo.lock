@@ -71,6 +71,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
+name = "blake2"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46502ad458c9a52b69d4d4d32775c788b7a1b85e8bc9d482d92250fc0e3f8efe"
+dependencies = [
+ "digest",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -80,10 +89,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bumpalo"
+version = "3.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
+
+[[package]]
 name = "bytes"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2bd12c1caf447e69cd4528f47f94d203fd2582878ecb9e9465484c4148a8223"
+
+[[package]]
+name = "castaway"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0abae9be0aaf9ea96a3b1b8b1b55c602ca751eba1b1500220cea4ecbafe7c0d5"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "cfg-if"
@@ -232,6 +256,7 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+ "subtle",
 ]
 
 [[package]]
@@ -254,9 +279,9 @@ checksum = "a5d9305ccc6942a704f4335694ecd3de2ea531b114ac2d51f5f843750787a92f"
 
 [[package]]
 name = "everscale-crypto"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3b3e4fc7882223c86a7cfd8ccdb58e017b89a9f91d90114beafa0e8d35b45fb"
+checksum = "0b0304a55e328ca4f354e59e6816bccb43b03f681b85b31c6bd10ea7233d62b5"
 dependencies = [
  "curve25519-dalek",
  "generic-array",
@@ -296,6 +321,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "everscale-vm"
+version = "0.1.0"
+source = "git+https://github.com/broxus/everscale-vm.git#177ffab853c986e737ff15d5bcb107d5b5aebc1a"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "bitflags",
+ "blake2",
+ "bumpalo",
+ "castaway",
+ "dyn-clone",
+ "everscale-crypto",
+ "everscale-types",
+ "everscale-vm-proc",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+ "sha2",
+ "thiserror",
+]
+
+[[package]]
+name = "everscale-vm-proc"
+version = "0.1.0"
+source = "git+https://github.com/broxus/everscale-vm.git#177ffab853c986e737ff15d5bcb107d5b5aebc1a"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "fiat-crypto"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -312,6 +370,7 @@ dependencies = [
  "dyn-clone",
  "everscale-crypto",
  "everscale-types",
+ "everscale-vm",
  "fift-proc",
  "hex",
  "num-bigint",
@@ -580,6 +639,12 @@ checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
  "semver",
 ]
+
+[[package]]
+name = "rustversion"
+version = "1.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7c45b9784283f1b2e7fb61b42047c2fd678ef0960d4f6f1eba131594cc369d4"
 
 [[package]]
 name = "rustyline"

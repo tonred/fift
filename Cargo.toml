@@ -20,7 +20,7 @@ anyhow = "1.0"
 base64 = "0.22"
 crc = "3.0"
 dyn-clone = "1.0"
-everscale-crypto = "0.2"
+everscale-crypto = "0.2.1"
 hex = "0.4"
 num-bigint = "0.4"
 num-integer = "0.1"
@@ -35,6 +35,7 @@ everscale-types = { version = "0.1.2", default-features = false, features = [
     "base64",
     "models",
 ] }
+everscale-vm = { git = "https://github.com/broxus/everscale-vm.git" }
 
 fift-proc = { path = "./proc", version = "=0.1.15" }
 
