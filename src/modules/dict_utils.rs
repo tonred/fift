@@ -30,7 +30,7 @@ impl DictUtils {
     fn interpret_store_dict(stack: &mut Stack) -> Result<()> {
         let maybe_cell = pop_maybe_cell(stack)?;
         let mut builder = stack.pop_builder()?;
-        maybe_cell.store_into(Rc::make_mut(&mut builder), &mut Cell::empty_context())?;
+        maybe_cell.store_into(Rc::make_mut(&mut builder), Cell::empty_context())?;
         stack.push_raw(builder)
     }
 
@@ -87,7 +87,7 @@ impl DictUtils {
             bits,
             &value,
             mode,
-            &mut Cell::empty_context(),
+            Cell::empty_context(),
         );
 
         // TODO: use operation result flag?
@@ -111,7 +111,7 @@ impl DictUtils {
         );
 
         let key = key.apply()?.get_prefix(bits, 0);
-        let value = dict_get(cell.as_ref(), bits, key, &mut Cell::empty_context())
+        let value = dict_get(cell.as_ref(), bits, key, Cell::empty_context())
             .ok()
             .flatten();
 
@@ -141,7 +141,7 @@ impl DictUtils {
         );
 
         let key = &mut key.apply()?.get_prefix(bits, 0);
-        let value = dict_remove_owned(&mut dict, key, bits, false, &mut Cell::empty_context())
+        let value = dict_remove_owned(&mut dict, key, bits, false, Cell::empty_context())
             .ok()
             .flatten();
 
@@ -269,7 +269,7 @@ impl LoopContImpl for DictMapCont {
                 key.size_bits(),
                 &value.as_full_slice(),
                 SetMode::Set,
-                &mut Cell::empty_context(),
+                Cell::empty_context(),
             )?;
         }
 
@@ -382,7 +382,7 @@ impl LoopContImpl for DictMergeCont {
                 key.size_bits(),
                 &value.apply()?,
                 SetMode::Set,
-                &mut Cell::empty_context(),
+                Cell::empty_context(),
             )?;
         };
 
@@ -410,7 +410,7 @@ impl LoopContImpl for DictMergeCont {
                 key.size_bits(),
                 &value.as_full_slice(),
                 SetMode::Set,
-                &mut Cell::empty_context(),
+                Cell::empty_context(),
             )?;
         }
 
