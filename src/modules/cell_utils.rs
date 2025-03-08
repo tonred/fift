@@ -388,7 +388,7 @@ impl CellUtils {
             stack.push_int(cs.range().size_bits())?;
         }
         if refs {
-            stack.push_int(cs.range().size_bits())?;
+            stack.push_int(cs.range().size_refs())?;
         }
         Ok(())
     }
@@ -533,7 +533,7 @@ impl<'a> StorageStat<'a> {
 
     fn add_slice<'b: 'a>(&mut self, slice: &'a CellSlice<'b>) -> bool {
         self.bits = self.bits.saturating_add(slice.size_bits() as u64);
-        self.refs = self.refs.saturating_add(slice.size_bits() as u64);
+        self.refs = self.refs.saturating_add(slice.size_refs() as u64);
 
         for cell in slice.references() {
             if !self.add_cell(cell) {
