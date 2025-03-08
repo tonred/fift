@@ -158,8 +158,9 @@ impl std::fmt::Display for DisplayCellSlice<'_, '_> {
             writeln!(f, "{:indent$}{}", "", DisplaySliceData(&cs))?;
 
             for cell in cs.references().rev() {
-                let cs = cell.as_slice_allow_pruned();
-                stack.push((indent + 1, cs));
+                if let Ok(cs) = cell.as_slice() {
+                    stack.push((indent + 1, cs));
+                }
             }
         }
 
